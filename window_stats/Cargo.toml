@@ -1,0 +1,8 @@
+[package]
+name = "window_stats"
+version = "0.1.0"
+authors = ["andamian <andreidaamian@gmail.com>"]
+
+[dependencies]
+winapi = { version = "0.3.5", features = ["winuser", "processthreadsapi", "psapi", "handleapi", "errhandlingapi"] }
+pad = "0.1"
