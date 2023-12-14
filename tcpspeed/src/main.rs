@@ -18,6 +18,8 @@ struct Args {
     client: Option<String>,
 }
 
+const NO_OF_SOCKETS: u8 = 4;
+
 fn main() {
     let args = Args::parse();
 
@@ -25,18 +27,22 @@ fn main() {
         Some(ip) => client(ip),
         None => server(),
     }
+
+    std::thread::sleep(Duration::from_secs(u64::MAX));
 }
 
 fn server() {
     let listener = TcpListener::bind("0.0.0.0:8080").unwrap();
 
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-        let bytes_sent = Arc::new(AtomicU64::new(0));
-        let bytes_sent_clone = bytes_sent.clone();
+    let bytes_sent = Arc::new(AtomicU64::new(0));
+    let bytes_sent_clone = bytes_sent.clone();
+    std::thread::spawn(|| print_progress(bytes_sent_clone));
 
-        std::thread::spawn(|| server_thread(stream, bytes_sent));
-        std::thread::spawn(|| print_progress(bytes_sent_clone));
+    for _ in 0..NO_OF_SOCKETS {
+        let stream = listener.accept().unwrap().0;
+
+        let bytes_sent_clone = bytes_sent.clone();
+        std::thread::spawn(|| server_thread(stream, bytes_sent_clone));
     }
 }
 
@@ -77,16 +83,11 @@ fn server_thread(mut socket: TcpStream, bytes_sent: Arc<AtomicU64>) {
     }
 }
 
-fn client(ip: String) {
+fn client_impl(ip: String, bytes_sent: Arc<AtomicU64>) {
     let mut socket = TcpStream::connect(ip).unwrap();
     socket.set_nodelay(true).unwrap();
 
     let mut buffer = [0; 64 * 1024];
-
-    let bytes_sent = Arc::new(AtomicU64::new(0));
-    let bytes_sent_clone = bytes_sent.clone();
-
-    std::thread::spawn(|| print_progress(bytes_sent_clone));
 
     loop {
         let read = socket.read(&mut buffer).unwrap();
@@ -96,5 +97,19 @@ fn client(ip: String) {
         }
 
         bytes_sent.fetch_add(read as u64, Ordering::Relaxed);
+    }
+}
+
+fn client(ip: String) {
+    let bytes_sent = Arc::new(AtomicU64::new(0));
+
+    let bytes_sent_clone = bytes_sent.clone();
+    std::thread::spawn(|| print_progress(bytes_sent_clone));
+
+    for _ in 0..NO_OF_SOCKETS {
+        let ip = ip.clone();
+        let bytes_sent_clone = bytes_sent.clone();
+
+        std::thread::spawn(|| client_impl(ip, bytes_sent_clone));
     }
 }
