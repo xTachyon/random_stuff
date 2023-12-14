@@ -56,6 +56,8 @@ fn print_progress(bytes: Arc<AtomicU64>) {
 }
 
 fn server_thread(mut socket: TcpStream, bytes_sent: Arc<AtomicU64>) {
+    socket.set_nodelay(true).unwrap();
+
     let buffer: Vec<u8> = (0..1024 * 1024).map(|x| x as u8).collect();
     let mut current = buffer.as_slice();
 
@@ -77,6 +79,8 @@ fn server_thread(mut socket: TcpStream, bytes_sent: Arc<AtomicU64>) {
 
 fn client(ip: String) {
     let mut socket = TcpStream::connect(ip).unwrap();
+    socket.set_nodelay(true).unwrap();
+
     let mut buffer = [0; 64 * 1024];
 
     let bytes_sent = Arc::new(AtomicU64::new(0));
